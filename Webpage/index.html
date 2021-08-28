@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html>
+<body>
+
+<h2>Digitaler Impfpass</h2>
+
+<pre id="vaccinePassResult"></pre>
+
+<h3>Suche Impfpass einer Person anhand der Personen ID</h3>
+
+<input type="text" id="personalIDSearch"/>
+<button id="getJsonBtn" onclick="getJSONFromPerson()" type="button">Suche Person</button>
+<br/>
+
+<h3>Kreiere einen neuen Impfpass für eine Person</h3>
+<p>Personen ID</p> 
+<input type="text" id="personalIDCreation"/>
+<br/>
+<p>Vorname und Nachname</p> 
+<input type="text" id="nameCreation"/>
+<br/>
+<p>Geburtsdatum</p> 
+<input type="text" id="birthdateCreation"/>
+<br/>
+<br/>
+<button id="insertJsonBtn" onclick="insertJSON()" type="button">Kreiere Person</button>
+
+
+<h3>Füge eine Impfung einer Person hinzu</h3>
+<p>Personen ID</p> 
+<input type="text" id="personalIDVaccine"/>
+<br/>
+<p>Name der Impfung/Krankheit</p> 
+<input type="text" id="descriptionVaccine"/>
+<br/>
+<p>Datum der Impfung</p> 
+<input type="text" id="dateVaccine"/>
+<br/>
+<p>Vor- und Nachname des Doktors</p> 
+<input type="text" id="doctorVaccine"/>
+<br/>
+<p>Ort der Impfung</p> 
+<input type="text" id="locationVaccine"/>
+<br/>
+<p>Ablaufdatum der Impfung/Neuimpfung</p> 
+<input type="text" id="expiringDateVaccine"/>
+<br/>
+<br/>
+<button id="insertVaccine" onclick="addVaccineToPerson()" type="button">Füge Impfung zur Person hinzu</button>
+<br/>
+<br/>
+<button id="randomSamples" onclick="createPeople()" type="button">Generiere 10 zufällige Beispiele	</button>
+
+
+
+<script src="https://cdn.jsdelivr.net/gh/ethereum/web3.js@1.0.0-beta.36/dist/web3.min.js"></script>
+<script src="contractABI.js"></script>
+<script src="setUpData.js"></script>
+<script>
+
+	//Define the web3 instance
+	if (typeof web3 !== 'undefined') {
+            web3 = new Web3(web3.currentProvider);
+        } else {
+            // set the provider you want from Web3.providers
+            web3 = new Web3(new Web3.providers.HttpProvider("http://localhost:7545"));
+		}   
+	
+
+	//Contract address and user Address is hardcoded...
+	//Metamask doesnt let me change it even if Code runs on local server...
+	var fromAddress =  '0x13be0A379C760E5251Ac32E98Ea3f9c3accAB19a'
+	var contractAddress = "0x114DD235A31A9831894f7189E766f4114654B665"
+	var contract = new web3.eth.Contract(contractABI, contractAddress, {from: fromAddress});
+
+
+	async function insertJSON(){
+		//create JSON with information given 
+		json = {};
+		json.personalID = document.getElementById('personalIDCreation').value;
+		json.name = document.getElementById('nameCreation').value;
+		json.birthdate = document.getElementById('birthdateCreation').value;
+
+		//Check for sufficient Information
+		if (json.personalID == '' || json.name == '' || json.birthdate == ''){
+			console.log("not enough information about person")
+			return null;
+		}
+
+		//Check if person exists
+		const personExists = await contract.methods.personExists(json.personalID).call().then(function(result){
+			return result;
+		});
+	
+		//Makes it that insertion is only possible for people that don't already exist
+		if (!personExists){
+			var result = await contract.methods.createPerson(json.personalID, json.name, json.birthdate).send();
+			console.log()
+		} 
+	}
+
+
+	async function getJSONFromPerson(){
+		//Create empty JSON to fill in with Information from Smart Contract
+		personalID = document.getElementById('personalIDSearch').value;
+		var json = {};
+		json.personalID = personalID;
+		var nbOfVaccines = await contract.methods.getNbOfVaccinesPerson(personalID).call();
+
+		await contract.methods.getPerson(personalID).call().then(function func(result){
+			json.name =  result[0];
+			json.birthdate =  result[1];
+		});
+
+		//Loop over the number of vaccines and retrieve every single one
+		json.vaccines = [];
+		for (var i = nbOfVaccines - 1; i >= 0; i--){
+			var vaccine = await contract.methods.getVaccineByIndex(personalID, i).call();
+			var jsonVaccine = {};
+
+			jsonVaccine.doctor = vaccine[0];
+			jsonVaccine.date = vaccine[1];
+			jsonVaccine.location = vaccine[2];
+			jsonVaccine.description = vaccine[3];
+			jsonVaccine.expiringDate = vaccine[4];
+			json.vaccines[i] = jsonVaccine;
+		}
+
+		//convert to JSON
+		jsonString = JSON.stringify(json, null, 4)
+		
+		//Print it on the webpage
+		var paragraph = document.getElementById("vaccinePassResult");
+		var text = document.createTextNode(jsonString);
+		
+		//Remove text if text has been already there
+		if(paragraph.firstChild){
+			paragraph.removeChild(paragraph.firstChild);
+		}
+		paragraph.appendChild(text);
+
+		return json
+	}
+
+	async function addVaccineToPerson(){
+		//Get Information
+		var personalID = document.getElementById('personalIDVaccine').value;
+		var vaccine = {}
+		vaccine.doctor = document.getElementById('doctorVaccine').value;
+		vaccine.date = document.getElementById('dateVaccine').value;
+		vaccine.location = document.getElementById('locationVaccine').value;
+		vaccine.description = document.getElementById('descriptionVaccine').value;
+		vaccine.expiringDate = document.getElementById('expiringDateVaccine').value;
+		if (personalID == '' || vaccine.expiringDate == '' || vaccine.doctor == '' || vaccine.date == '' || vaccine.location == '' || vaccine.description == ''){
+			console.log("not enough information about Vaccine")
+			return null;
+		}
+
+		//estimate Gas cost and add Vaccine
+		var estimatedCost = await contract.methods.addVaccineTo(personalID, vaccine.doctor, vaccine.date, vaccine.location, vaccine.description, vaccine.expiringDate).estimateGas()
+		await contract.methods.addVaccineTo(personalID, vaccine.doctor, vaccine.date, vaccine.location, vaccine.description, vaccine.expiringDate).send({ gas:estimatedCost + (estimatedCost / 5) })
+	}
+
+
+	//%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+	//SAMPLE GENERATION FOR TESTING
+	//%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+	async function insertSample(json){
+		
+		//Create random samples for testnig purposes
+		const personExists = await contract.methods.personExists(json.personalID).call().then(function(result){
+			return result;
+		});
+
+		//Makes it that insertion is only possible for people that don't already exist
+		if (!personExists){
+			await contract.methods.createPerson(json.personalID, json.name, json.birthdate).send();
+		}
+
+		//Add existing vaccines to person 
+		for (var i = 0; i < json.vaccines.length; i++){
+			var vaccine = json.vaccines[i];
+			await addVaccineToSamplePerson(json.personalID, vaccine);
+		}
+	}
+
+
+	async function addVaccineToSamplePerson(personalID, vaccine){
+		var estimatedCost = await contract.methods.addVaccineTo(personalID, vaccine.doctor, vaccine.date, vaccine.location, vaccine.description, vaccine.expiringDate).estimateGas()
+		await contract.methods.addVaccineTo(personalID, vaccine.doctor, vaccine.date, vaccine.location, vaccine.description, vaccine.expiringDate).send({ gas:estimatedCost + (estimatedCost / 5) })
+	}
+
+	//Generates random Samples
+	async function createPeople(){
+		var json = generateSamples(10);
+		for (var i = 0; i < json.persons.length; i++){
+		console.log(json.persons[i]);
+		await insertSample(json.persons[i]);
+		}
+	}
+</script>
+</body>
+</html>
