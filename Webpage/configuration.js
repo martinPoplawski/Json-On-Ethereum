@@ -1,0 +1,2 @@
+const contractAddress = "0x114DD235A31A9831894f7189E766f4114654B665"
+const ethereumAddress = '0x13be0A379C760E5251Ac32E98Ea3f9c3accAB19a'
