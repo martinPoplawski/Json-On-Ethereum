@@ -55,6 +55,7 @@
 
 <script src="https://cdn.jsdelivr.net/gh/ethereum/web3.js@1.0.0-beta.36/dist/web3.min.js"></script>
 <script src="contractABI.js"></script>
+<script src="configuration.js"></script>	
 <script src="setUpData.js"></script>
 <script>
 
@@ -69,9 +70,7 @@
 
 	//Contract address and user Address is hardcoded...
 	//Metamask doesnt let me change it even if Code runs on local server...
-	var fromAddress =  '0x13be0A379C760E5251Ac32E98Ea3f9c3accAB19a'
-	var contractAddress = "0x114DD235A31A9831894f7189E766f4114654B665"
-	var contract = new web3.eth.Contract(contractABI, contractAddress, {from: fromAddress});
+	var contract = new web3.eth.Contract(contractABI, contractAddress, {from: contractAddress});
 
 
 	async function insertJSON(){
